@@ -88,7 +88,8 @@ def find_key_frames(video_path, scenes):
     
     # List to hold the key frames extracted from each scene.
     key_frames = []
-
+    total_scenes = len(scenes)
+    scene_index = 0
     # Iterate through each scene to analyze its frames.
     for start, end in scenes:
         max_frame = None  # To hold the frame with the maximum change.
@@ -121,11 +122,15 @@ def find_key_frames(video_path, scenes):
         # If a maximum difference frame was found, add it to the list of key frames.
         if max_frame is not None:
             key_frames.append(max_frame)
-
+            
+        progress_percentage = ((scene_index + 1) / total_scenes) * 100
+        print(f"Progress: {progress_percentage:.2f}%", end='\r')
+        scene_index += 1
+        
+        
+    print("\nKey frame extraction complete.")
     # Release the video capture resources.
     cap.release()
-
-    print("Key frames analysis completed successfully")
     
     # Return the list of key frames.
     return key_frames
@@ -152,7 +157,7 @@ def find_key_frames_with_face_priority_optimized(video_path, scenes):
     # face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     
     total_scenes = len(scenes)
-    scene_index = 1
+    scene_index = 0
 
     for start, end in scenes:
         best_frame = None
@@ -218,8 +223,8 @@ def detect_text_in_frame(frames):
         if results:
             for (bbox, text, prob) in results:
                 print(f"Detected text: {text} with confidence {prob:.2f}")
-        else:
-            print("No text detected.")
+        # else:
+        #     print("No text detected.")
 
 def create_gif_from_frames(frames, output_path='summary.gif', fps=5, max_duration=10):
     print(f"{len(frames)} key frames were found.")
@@ -310,12 +315,12 @@ if __name__ == "__main__":
     scenes = detect_scenes(video_path)
 
     # Step 3: Find key frames.
-    key_frames = find_key_frames_with_face_priority_optimized(video_path, scenes)
-    # key_frames = find_key_frames(video_path, scenes)
+    # key_frames = find_key_frames_with_face_priority_optimized(video_path, scenes)
+    key_frames = find_key_frames(video_path, scenes)
     
     # step 4: Detect text in each key frame
-    # detect_text_in_frame(key_frames)
+    detect_text_in_frame(key_frames)
 
     # Step 5: Create a GIF from the key frames.
-    create_gif_from_frames(key_frames, 'summary3.gif', fps=5, max_duration=10)
+    create_gif_from_frames(key_frames, 'summary4.gif', fps=5, max_duration=10)
 
