@@ -37,10 +37,12 @@ def detect_scenes(video_path):
     Returns:
     - list of tuples: A list where each tuple represents a scene, containing the start and end frame numbers.
     """
-    print("Starting scene detection process")
+    
     
     # Initialize the video manager with the path to the video.
     video_manager = VideoManager([video_path])
+    
+    print("Starting scene detection process")
     
     # Create a scene manager instance to hold and use scene detectors.
     scene_manager = SceneManager()
@@ -140,12 +142,17 @@ def find_key_frames_with_face_priority_optimized(video_path, scenes):
     Returns:
     - list of np.array: A list of key frames selected from the scenes, each as a NumPy array.
     """
+    print("Starting key frames extraction process, this may take a few minuets")
+    
     cap = cv2.VideoCapture(video_path)
     key_frames = []
     # Load the Haar cascade for face detection.
     face_cascade_path = r"haarcascade_frontalface_default.xml"
     face_cascade = cv2.CascadeClassifier(face_cascade_path)
     # face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    
+    total_scenes = len(scenes)
+    scene_index = 1
 
     for start, end in scenes:
         best_frame = None
@@ -164,7 +171,7 @@ def find_key_frames_with_face_priority_optimized(video_path, scenes):
             faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
             
             # Score frames based on the presence of faces, with a higher score for more faces
-            face_score = len(faces) * 1000  # Give a high score for each face detected
+            face_score = len(faces) * 10000  # Give a high score for each face detected
 
             if frame_num == start:
                 prev_frame = gray
@@ -186,7 +193,13 @@ def find_key_frames_with_face_priority_optimized(video_path, scenes):
 
         if best_frame is not None:
             key_frames.append(best_frame)
-
+            
+        # Update and display progress bar
+        progress_percentage = ((scene_index + 1) / total_scenes) * 100
+        print(f"Progress: {progress_percentage:.2f}%", end='\r')
+        scene_index += 1
+        
+    print("\nKey frame extraction complete.")
     cap.release()
     return key_frames
 
@@ -304,5 +317,5 @@ if __name__ == "__main__":
     # detect_text_in_frame(key_frames)
 
     # Step 5: Create a GIF from the key frames.
-    create_gif_from_frames(key_frames, 'summary2.gif', fps=5, max_duration=10)
+    create_gif_from_frames(key_frames, 'summary3.gif', fps=5, max_duration=10)
 
