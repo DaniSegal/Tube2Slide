@@ -6,18 +6,23 @@ from scenedetect.detectors import ContentDetector
 import cv2
 import numpy as np
 import imageio
+import os
+import easyocr
 
 
 def download_top_video(search_string):
-    # Perform the search
     s = Search(search_string)
     for video in s.results:
-        # Get the video's duration in seconds
         yt = YouTube(video.watch_url)
-        if yt.length < 600:  # 10 minutes = 600 seconds
-            print(f"Downloading: {yt.title}")
-            yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first().download()
-            print("Download completed!")
+        if yt.length < 240:  # 4 minutes = 240 seconds
+            file_name = f"{yt.title}.mp4"
+            # Check if the file already exists
+            if not os.path.isfile(file_name):
+                print(f"Downloading: {yt.title}")
+                yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first().download(filename=file_name)
+                print("Download completed!")
+            else:
+                print(f"File already exists: {file_name}")
             return yt.title
     else:
         print("No suitable video found.")
@@ -32,6 +37,8 @@ def detect_scenes(video_path):
     Returns:
     - list of tuples: A list where each tuple represents a scene, containing the start and end frame numbers.
     """
+    print("Starting scene detection process")
+    
     # Initialize the video manager with the path to the video.
     video_manager = VideoManager([video_path])
     
@@ -72,6 +79,8 @@ def find_key_frames(video_path, scenes):
     Returns:
     - list of np.array: A list of key frames selected from the scenes, each as a NumPy array.
     """
+    print("Starting key frames extraction process, this may take a few minuets")
+    
     # Initialize video capture with the path to the video.
     cap = cv2.VideoCapture(video_path)
     
@@ -114,34 +123,186 @@ def find_key_frames(video_path, scenes):
     # Release the video capture resources.
     cap.release()
 
+    print("Key frames analysis completed successfully")
+    
     # Return the list of key frames.
     return key_frames
 
-def create_gif_from_frames(frames, output_path='summary.gif', fps=1):
-    # Convert frames to RGB and check if the list is empty
+def find_key_frames_with_face_priority_optimized(video_path, scenes):
+    """
+    Optimized function to find key frames within each detected scene by analyzing frame-to-frame changes
+    and prioritizing frames with faces.
+
+    Parameters:
+    - video_path (str): Path to the video file.
+    - scenes (list of tuples): Each tuple contains the start and end frame numbers of a scene.
+
+    Returns:
+    - list of np.array: A list of key frames selected from the scenes, each as a NumPy array.
+    """
+    cap = cv2.VideoCapture(video_path)
+    key_frames = []
+    # Load the Haar cascade for face detection.
+    face_cascade_path = r"haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(face_cascade_path)
+    # face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    for start, end in scenes:
+        best_frame = None
+        best_score = 0  # Initialize best score to 0
+
+        for frame_num in range(start, end):
+            
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+            ret, frame = cap.read()
+            if not ret:
+                break  # Exit loop if frame cannot be read
+
+            # Convert frame to grayscale to reduce computation for face detection and diff calculation
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Detect faces in the frame
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            
+            # Score frames based on the presence of faces, with a higher score for more faces
+            face_score = len(faces) * 1000  # Give a high score for each face detected
+
+            if frame_num == start:
+                prev_frame = gray
+                best_frame = frame
+                best_score = face_score
+            else:
+                # Calculate frame difference
+                diff = cv2.absdiff(prev_frame, gray)
+                change_score = np.sum(diff)  # Use the sum of absolute differences as the change score
+                
+                # Combine scores, prioritizing face score
+                total_score = face_score + change_score / 10000  # Adjust change score's influence
+
+                if total_score > best_score:
+                    best_frame = frame
+                    best_score = total_score
+
+            prev_frame = gray  # Update the previous frame for the next iteration
+
+        if best_frame is not None:
+            key_frames.append(best_frame)
+
+    cap.release()
+    return key_frames
+
+def detect_text_in_frame(frames):
+    
+    for frame in frames:
+        # Initialize EasyOCR Reader
+        reader = easyocr.Reader(['en'])  # Assuming English text; adjust the language as needed.
+        
+        # Ensure the frame is in the correct color format (EasyOCR expects RGB)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Detect text in the frame
+        results = reader.readtext(frame_rgb)
+        
+        if results:
+            for (bbox, text, prob) in results:
+                print(f"Detected text: {text} with confidence {prob:.2f}")
+        else:
+            print("No text detected.")
+
+def create_gif_from_frames(frames, output_path='summary.gif', fps=5, max_duration=10):
+    print(f"{len(frames)} key frames were found.")
+    # Adjust frames to fit the max_duration limit
+    max_frames = fps * max_duration
+    if len(frames) > max_frames:
+        step = len(frames) // max_frames
+        frames = frames[::step][:max_frames]
     frames_rgb = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
-    if not frames_rgb:
+    if frames_rgb:
+        imageio.mimsave(output_path, frames_rgb, fps=fps)
+        print("GIF created successfully.")
+    else:
         print("No frames to create a GIF. Exiting.")
-        return  # Exit the function if there are no frames to process
 
-    imageio.mimsave(output_path, frames_rgb, fps=fps)
+# def find_key_frames_with_face_priority_optimized(video_path, scenes):
+    # """
+    # Optimized function to find key frames within each detected scene by analyzing frame-to-frame changes
+    # and prioritizing frames with faces.
 
+    # Parameters:
+    # - video_path (str): Path to the video file.
+    # - scenes (list of tuples): Each tuple contains the start and end frame numbers of a scene.
 
+    # Returns:
+    # - list of np.array: A list of key frames selected from the scenes, each as a NumPy array.
+    # """
+    # cap = cv2.VideoCapture(video_path)
+    # key_frames = []
+    # # Load the Haar cascade for face detection.
+    # face_cascade_path = r"C:\Users\DanielSegal\anaconda3\pkgs\libopencv-4.9.0-qt6_py312hd35d245_612\Library\etc\haarcascades\haarcascade_frontalface_default.xml"
+    # face_cascade = cv2.CascadeClassifier(face_cascade_path)
+
+    # # face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    # for start, end in scenes:
+    #     best_frame = None
+    #     best_score = 0  # Initialize best score to 0
+
+    #     for frame_num in range(start, end):
+    #         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+    #         ret, frame = cap.read()
+    #         if not ret:
+    #             break  # Exit loop if frame cannot be read
+
+    #         # Convert frame to grayscale to reduce computation for face detection and diff calculation
+    #         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    #         # Detect faces in the frame
+    #         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            
+    #         # Score frames based on the presence of faces, with a higher score for more faces
+    #         face_score = len(faces) * 1000  # Give a high score for each face detected
+
+    #         if frame_num == start:
+    #             prev_frame = gray
+    #             best_frame = frame
+    #             best_score = face_score
+    #         else:
+    #             # Calculate frame difference
+    #             diff = cv2.absdiff(prev_frame, gray)
+    #             change_score = np.sum(diff)  # Use the sum of absolute differences as the change score
+                
+    #             # Combine scores, prioritizing face score
+    #             total_score = face_score + change_score / 10000  # Adjust change score's influence
+
+    #             if total_score > best_score:
+    #                 best_frame = frame
+    #                 best_score = total_score
+
+    #         prev_frame = gray  # Update the previous frame for the next iteration
+
+    #     if best_frame is not None:
+    #         key_frames.append(best_frame)
+
+    # cap.release()
+    # return key_frames
 
 if __name__ == "__main__":
-    search_string = input("Enter the search string: ")
-    video_name = download_top_video(search_string)
+    # search_string = input("Enter the search string: ")
+    # video_name = download_top_video(search_string)
     
-    print(video_name)
+    # print(video_name)
 
-    video_path = f'{video_name}.mp4'
+    # video_path = f'{video_name}.mp4'
+    video_path = r'Dune Official Trailer.mp4'
 
     # Step 2: Detect scene changes.
     scenes = detect_scenes(video_path)
 
     # Step 3: Find key frames.
-    key_frames = find_key_frames(video_path, scenes)
+    key_frames = find_key_frames_with_face_priority_optimized(video_path, scenes)
+    # key_frames = find_key_frames(video_path, scenes)
+    
+    # step 4: Detect text in each key frame
+    # detect_text_in_frame(key_frames)
 
-    # Step 4: Create a GIF from the key frames.
-    create_gif_from_frames(key_frames, 'summary.gif', fps=1)
+    # Step 5: Create a GIF from the key frames.
+    create_gif_from_frames(key_frames, 'summary2.gif', fps=5, max_duration=10)
 
