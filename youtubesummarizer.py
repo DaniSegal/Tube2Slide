@@ -124,7 +124,8 @@ def find_key_frames(video_path, scenes):
 
         # If a maximum difference frame was found, add it to the list of key frames.
         if max_frame is not None:
-            key_frames.append(max_frame)
+            max_frame_marked = add_watermark(max_frame, 'D a n i e l  S e g a l')
+            key_frames.append(max_frame_marked)
             
         progress_percentage = ((scene_index + 1) / total_scenes) * 100
         print(f"Progress: {progress_percentage:.2f}%", end='\r')
@@ -200,7 +201,8 @@ def find_key_frames_with_face_priority_optimized(video_path, scenes):
             prev_frame = gray  # Update the previous frame for the next iteration
 
         if best_frame is not None:
-            key_frames.append(best_frame)
+            best_watermarked_frame = add_watermark(best_frame, 'DanielSegal')
+            key_frames.append(best_watermarked_frame)
             
         # Update and display progress bar
         progress_percentage = ((scene_index + 1) / total_scenes) * 100
@@ -228,6 +230,38 @@ def detect_text_in_frame(frames):
                 print(f"Detected text: {text} with confidence {prob:.2f}")
         # else:
         #     print("No text detected.")
+
+def add_watermark(frame, text, font_size=5, font_thickness=1, color=(255, 255, 255)):
+    try:
+        # Get the frame dimensions
+        if len(frame.shape) == 3:
+            height, width, _ = frame.shape
+        else:
+            height, width = frame.shape
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+
+        # Create a copy of the frame to avoid modifying the original
+        watermarked_frame = frame.copy()
+
+        # Set the font and scale
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = font_size / 10  # Adjusted from 100 to 10 for visibility
+
+        # Get the text size
+        text_size, _ = cv2.getTextSize(text, font, scale, font_thickness)
+        text_width, text_height = text_size
+
+        # Calculate the position to place the watermark (bottom-right corner)
+        x = width - text_width - 10
+        y = height - text_height - 10
+
+        # Add the watermark to the frame
+        cv2.putText(watermarked_frame, text, (x, y), font, scale, color, font_thickness, cv2.LINE_AA)
+
+        return watermarked_frame
+    except Exception as e:
+        print(f"Error in add_watermark: {e}")
+        return frame
 
 def create_gif_from_frames(frames, output_path='summary.gif', fps=5, max_duration=10):
     print(f"{len(frames)} key frames were found.")
@@ -274,88 +308,26 @@ def play_gif(gif_path):
     root.after(0, update, 0)
     root.mainloop()
 
-# def find_key_frames_with_face_priority_optimized(video_path, scenes):
-    # """
-    # Optimized function to find key frames within each detected scene by analyzing frame-to-frame changes
-    # and prioritizing frames with faces.
-
-    # Parameters:
-    # - video_path (str): Path to the video file.
-    # - scenes (list of tuples): Each tuple contains the start and end frame numbers of a scene.
-
-    # Returns:
-    # - list of np.array: A list of key frames selected from the scenes, each as a NumPy array.
-    # """
-    # cap = cv2.VideoCapture(video_path)
-    # key_frames = []
-    # # Load the Haar cascade for face detection.
-    # face_cascade_path = r"C:\Users\DanielSegal\anaconda3\pkgs\libopencv-4.9.0-qt6_py312hd35d245_612\Library\etc\haarcascades\haarcascade_frontalface_default.xml"
-    # face_cascade = cv2.CascadeClassifier(face_cascade_path)
-
-    # # face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
-    # for start, end in scenes:
-    #     best_frame = None
-    #     best_score = 0  # Initialize best score to 0
-
-    #     for frame_num in range(start, end):
-    #         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-    #         ret, frame = cap.read()
-    #         if not ret:
-    #             break  # Exit loop if frame cannot be read
-
-    #         # Convert frame to grayscale to reduce computation for face detection and diff calculation
-    #         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    #         # Detect faces in the frame
-    #         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-            
-    #         # Score frames based on the presence of faces, with a higher score for more faces
-    #         face_score = len(faces) * 1000  # Give a high score for each face detected
-
-    #         if frame_num == start:
-    #             prev_frame = gray
-    #             best_frame = frame
-    #             best_score = face_score
-    #         else:
-    #             # Calculate frame difference
-    #             diff = cv2.absdiff(prev_frame, gray)
-    #             change_score = np.sum(diff)  # Use the sum of absolute differences as the change score
-                
-    #             # Combine scores, prioritizing face score
-    #             total_score = face_score + change_score / 10000  # Adjust change score's influence
-
-    #             if total_score > best_score:
-    #                 best_frame = frame
-    #                 best_score = total_score
-
-    #         prev_frame = gray  # Update the previous frame for the next iteration
-
-    #     if best_frame is not None:
-    #         key_frames.append(best_frame)
-
-    # cap.release()
-    # return key_frames
-
 if __name__ == "__main__":
-    # search_string = input("Enter the search string: ")
-    # video_name = download_top_video(search_string)
+    search_string = input("Enter the search string: ")
+    video_name = download_top_video(search_string)
     
-    # video_path = f'{video_name}.mp4'
-    video_path = r'Numb.mp4'
+    video_path = f'{video_name}.mp4'
+    
 
     # Step 2: Detect scene changes.
-    # scenes = detect_scenes(video_path)
+    scenes = detect_scenes(video_path)
 
     # Step 3: Find key frames.
     # key_frames = find_key_frames_with_face_priority_optimized(video_path, scenes)
-    # key_frames = find_key_frames(video_path, scenes)
+    key_frames = find_key_frames(video_path, scenes)
     
     # step 4: Detect text in each key frame
-    # detect_text_in_frame(key_frames)
+    detect_text_in_frame(key_frames)
 
-    gif_output_path = 'summary6.gif'
+    gif_output_path = 'summary.gif'
     # Step 5: Create a GIF from the key frames.
-    # create_gif_from_frames(key_frames, gif_output_path, fps=5, max_duration=10)
+    create_gif_from_frames(key_frames, gif_output_path, fps=5, max_duration=10)
     
     # step 6: Play the created gif
     play_gif(gif_output_path)
