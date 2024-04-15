@@ -8,6 +8,9 @@ import numpy as np
 import imageio
 import os
 import easyocr
+import tkinter as tk
+from PIL import Image, ImageTk
+
 
 
 def download_top_video(search_string):
@@ -240,6 +243,37 @@ def create_gif_from_frames(frames, output_path='summary.gif', fps=5, max_duratio
     else:
         print("No frames to create a GIF. Exiting.")
 
+def play_gif(gif_path):
+    root = tk.Tk()
+    root.title("Display GIF")
+
+    # Open the GIF image
+    gif = Image.open(gif_path)
+
+    # Create frames from the GIF
+    frames = []
+    try:
+        while True:
+            frame = ImageTk.PhotoImage(gif.copy())
+            frames.append(frame)
+            gif.seek(len(frames))
+    except EOFError:
+        pass
+
+    def update(ind):
+        frame = frames[ind]
+        ind += 1
+        if ind == len(frames):
+            ind = 0
+        label.configure(image=frame)
+        root.after(100, update, ind)  # adjust timing here if necessary
+
+    label = tk.Label(root)
+    label.pack()
+
+    root.after(0, update, 0)
+    root.mainloop()
+
 # def find_key_frames_with_face_priority_optimized(video_path, scenes):
     # """
     # Optimized function to find key frames within each detected scene by analyzing frame-to-frame changes
@@ -306,21 +340,23 @@ if __name__ == "__main__":
     # search_string = input("Enter the search string: ")
     # video_name = download_top_video(search_string)
     
-    # print(video_name)
-
     # video_path = f'{video_name}.mp4'
-    video_path = r'Dune Official Trailer.mp4'
+    video_path = r'Numb.mp4'
 
     # Step 2: Detect scene changes.
-    scenes = detect_scenes(video_path)
+    # scenes = detect_scenes(video_path)
 
     # Step 3: Find key frames.
     # key_frames = find_key_frames_with_face_priority_optimized(video_path, scenes)
-    key_frames = find_key_frames(video_path, scenes)
+    # key_frames = find_key_frames(video_path, scenes)
     
     # step 4: Detect text in each key frame
-    detect_text_in_frame(key_frames)
+    # detect_text_in_frame(key_frames)
 
+    gif_output_path = 'summary6.gif'
     # Step 5: Create a GIF from the key frames.
-    create_gif_from_frames(key_frames, 'summary4.gif', fps=5, max_duration=10)
+    # create_gif_from_frames(key_frames, gif_output_path, fps=5, max_duration=10)
+    
+    # step 6: Play the created gif
+    play_gif(gif_output_path)
 
