@@ -319,6 +319,7 @@ if __name__ == "__main__":
     scenes = detect_scenes(video_path)
 
     # Step 3: Find key frames.
+    
     # key_frames = find_key_frames_with_face_priority_optimized(video_path, scenes)
     key_frames = find_key_frames(video_path, scenes)
     
