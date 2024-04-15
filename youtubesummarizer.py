@@ -124,8 +124,7 @@ def find_key_frames(video_path, scenes):
 
         # If a maximum difference frame was found, add it to the list of key frames.
         if max_frame is not None:
-            max_frame_marked = add_watermark(max_frame, 'D a n i e l  S e g a l')
-            key_frames.append(max_frame_marked)
+            key_frames.append(max_frame)
             
         progress_percentage = ((scene_index + 1) / total_scenes) * 100
         print(f"Progress: {progress_percentage:.2f}%", end='\r')
@@ -201,8 +200,7 @@ def find_key_frames_with_face_priority_optimized(video_path, scenes):
             prev_frame = gray  # Update the previous frame for the next iteration
 
         if best_frame is not None:
-            best_watermarked_frame = add_watermark(best_frame, 'DanielSegal')
-            key_frames.append(best_watermarked_frame)
+            key_frames.append(best_frame)
             
         # Update and display progress bar
         progress_percentage = ((scene_index + 1) / total_scenes) * 100
@@ -231,37 +229,44 @@ def detect_text_in_frame(frames):
         # else:
         #     print("No text detected.")
 
-def add_watermark(frame, text, font_size=5, font_thickness=1, color=(255, 255, 255)):
-    try:
-        # Get the frame dimensions
-        if len(frame.shape) == 3:
-            height, width, _ = frame.shape
-        else:
-            height, width = frame.shape
-            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+def add_watermark(frames, text, font_size=5, font_thickness=1, color=(255, 255, 255)):
+    
+    watermarked_frames = []
+    
+    for frame in frames:
+    
+        try:
+            # Get the frame dimensions
+            if len(frame.shape) == 3:
+                height, width, _ = frame.shape
+            else:
+                height, width = frame.shape
+                frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
-        # Create a copy of the frame to avoid modifying the original
-        watermarked_frame = frame.copy()
+            # Create a copy of the frame to avoid modifying the original
+            watermarked_frame = frame.copy()
 
-        # Set the font and scale
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        scale = font_size / 10  # Adjusted from 100 to 10 for visibility
+            # Set the font and scale
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            scale = font_size / 10  # Adjusted from 100 to 10 for visibility
 
-        # Get the text size
-        text_size, _ = cv2.getTextSize(text, font, scale, font_thickness)
-        text_width, text_height = text_size
+            # Get the text size
+            text_size, _ = cv2.getTextSize(text, font, scale, font_thickness)
+            text_width, text_height = text_size
 
-        # Calculate the position to place the watermark (bottom-right corner)
-        x = width - text_width - 10
-        y = height - text_height - 10
+            # Calculate the position to place the watermark (bottom-right corner)
+            x = width - text_width - 10
+            y = height - text_height - 10
 
-        # Add the watermark to the frame
-        cv2.putText(watermarked_frame, text, (x, y), font, scale, color, font_thickness, cv2.LINE_AA)
+            # Add the watermark to the frame
+            cv2.putText(watermarked_frame, text, (x, y), font, scale, color, font_thickness, cv2.LINE_AA)
 
-        return watermarked_frame
-    except Exception as e:
-        print(f"Error in add_watermark: {e}")
-        return frame
+            watermarked_frames.append(watermarked_frame)
+        
+        except Exception as e:
+            print(f"Error in add_watermark: {e}")
+            
+    return watermarked_frames
 
 def create_gif_from_frames(frames, output_path='summary.gif', fps=5, max_duration=10):
     print(f"{len(frames)} key frames were found.")
@@ -325,10 +330,13 @@ if __name__ == "__main__":
     
     # step 4: Detect text in each key frame
     detect_text_in_frame(key_frames)
-
+    
+    marked_frames = add_watermark(key_frames, 'D a n i e l  S e g a l')
+    
     gif_output_path = 'summary.gif'
+    
     # Step 5: Create a GIF from the key frames.
-    create_gif_from_frames(key_frames, gif_output_path, fps=5, max_duration=10)
+    create_gif_from_frames(marked_frames, gif_output_path, fps=5, max_duration=10)
     
     # step 6: Play the created gif
     play_gif(gif_output_path)
